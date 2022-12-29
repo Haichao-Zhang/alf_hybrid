@@ -34,7 +34,9 @@ except ModuleNotFoundError:
 
 from torch.nn import Module, Parameter
 
-del Module.__getattr__
+
+# should keep getattr for other cases
+# del Module.__getattr__
 
 _old_Module__setattr__ = torch.nn.Module.__setattr__
 
