@@ -1697,7 +1697,7 @@ class Algorithm(AlgorithmInterface):
         info = dist_utils.params_to_distributions(info, self.train_info_spec)
         return info
 
-    @data_distributed_when(lambda algorithm: not algorithm.on_policy)
+    # @data_distributed_when(lambda algorithm: not algorithm.on_policy)
     def _compute_train_info_and_loss_info(self, experience):
         """Compute train_info and loss_info based on the experience.
 
