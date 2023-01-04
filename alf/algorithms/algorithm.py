@@ -1053,7 +1053,8 @@ class Algorithm(AlgorithmInterface):
                              loss_info,
                              valid_masks=None,
                              weight=1.0,
-                             batch_info=None):
+                             batch_info=None,
+                             skip_backward=False):
         """Complete one iteration of training.
 
         Update parameters using the gradient with respect to ``loss_info``.
@@ -1067,6 +1068,7 @@ class Algorithm(AlgorithmInterface):
                 this weight before calculating gradient.
             batch_info (BatchInfo): information about this batch returned by
                 ``ReplayBuffer.get_batch()``
+            skip_backward (bool): skip_backward
         Returns:
             tuple:
             - loss_info (LossInfo): loss information.
@@ -1078,10 +1080,14 @@ class Algorithm(AlgorithmInterface):
 
         loss_info = self._aggregate_loss(loss_info, valid_masks, batch_info)
 
-        all_params, gns = self._backward_and_gradient_update(
-            loss_info.loss * weight)
 
-        loss_info = loss_info._replace(gns=gns)
+        if not skip_backward:
+            all_params, gns = self._backward_and_gradient_update(
+                loss_info.loss * weight)
+            loss_info = loss_info._replace(gns=gns)
+        else:
+            all_params = []
+
         loss_info = alf.nest.map_structure(torch.mean, loss_info)
 
         return loss_info, all_params
@@ -1141,7 +1147,9 @@ class Algorithm(AlgorithmInterface):
         Args:
             loss (Tensor): an aggregated scalar loss
         Returns:
-            params (list[(name, Parameter)]): list of parameters being updated.
+            tuple:
+            - params (list[(name, Parameter)]): list of parameters being updated.
+            - simple_gns (GradientNoiseScaleEstimator): gradient noise scale estimator
         """
         unhandled = self._setup_optimizers()
         unhandled = [self._param_to_name[p] for p in unhandled]
@@ -1275,7 +1283,7 @@ class Algorithm(AlgorithmInterface):
             # in subclass
             logging.exception('need to implement calc_loss_offline function')
 
-    def train_from_unroll(self, experience, train_info):
+    def train_from_unroll(self, experience, train_info, skip_backward=False):
         """Train given the info collected from ``unroll()``. This function can
         be called by any child algorithm that doesn't have the unroll logic but
         has a different training logic with its parent (e.g., off-policy).
@@ -1294,13 +1302,14 @@ class Algorithm(AlgorithmInterface):
             valid_masks = None
         experience = experience._replace(rollout_info_field='rollout_info')
         loss_info = self.calc_loss(train_info)
-        loss_info, params = self.update_with_gradient(loss_info, valid_masks)
+        loss_info, params = self.update_with_gradient(loss_info, valid_masks, skip_backward=skip_backward)
         self.after_update(experience.time_step, train_info)
         self.summarize_train(experience, train_info, loss_info, params)
         return torch.tensor(alf.nest.get_nest_shape(experience)).prod()
 
+
     @common.mark_replay
-    def train_from_replay_buffer(self, update_global_counter=False):
+    def train_from_replay_buffer(self, update_global_counter=False, skip_backward=False):
         """This function can be called by any algorithm that has its own
         replay buffer configured. There are several parameters specified in
         ``self._config`` that will affect how the training is performed:
@@ -1342,8 +1351,11 @@ class Algorithm(AlgorithmInterface):
                 quantity and child algorithms should disable the flag. When it's
                 ``True``, it will affect the counter only if
                 ``config.update_counter_every_mini_batch=True``.
+            mode (str): either "train", "loss". If "loss", only the loss will be
+                calculated without backward or gradient updating
         """
         config: TrainerConfig = self._config
+
 
         # returns 0 if haven't started training yet, when ``_replay_buffer`` is
         # not None and the number of samples in the buffer is less than
@@ -1392,7 +1404,8 @@ class Algorithm(AlgorithmInterface):
                     (config.update_counter_every_mini_batch
                      and update_global_counter),
                     whole_replay_buffer_training=config.
-                    whole_replay_buffer_training)
+                    whole_replay_buffer_training,
+                    skip_backward=skip_backward)
         else:
             # hybrid training scheme
             global_step = alf.summary.get_global_counter()
@@ -1438,7 +1451,8 @@ class Algorithm(AlgorithmInterface):
                           mini_batch_size,
                           mini_batch_length,
                           update_counter_every_mini_batch,
-                          whole_replay_buffer_training: bool = False):
+                          whole_replay_buffer_training: bool = False,
+                          skip_backward = False):
         """Train using experience."""
         (experience, processed_exp_spec, batch_info, length, mini_batch_length,
          batch_size) = self._prepare_experience_data(
@@ -1526,12 +1540,17 @@ class Algorithm(AlgorithmInterface):
                     mini_batch_list[0],
                     mini_batch_info_list[0],
                     weight=alf.nest.get_nest_size(mini_batch_list[0], 1) /
-                    mini_batch_size)
+                    mini_batch_size,
+                    skip_backward=skip_backward)
                 if do_summary:
                     self.summarize_train(exp, train_info, loss_info, params)
 
         train_steps = batch_size * mini_batch_length * num_updates
-        return train_steps
+
+        if skip_backward:
+            return loss_info
+        else:
+            return train_steps
 
     def _prepare_experience_data(self,
                                  experience,
@@ -1745,7 +1764,7 @@ class Algorithm(AlgorithmInterface):
             assert batch_info is None or batch_info.importance_weights == (), (
                 "Priority replay is enabled. But priority is not calculated.")
 
-    def _update(self, experience, batch_info, weight):
+    def _update(self, experience, batch_info, weight, skip_backward=False):
         """
             experience (Experience): experience from the online buffer used for
                 gradient update.
@@ -1766,7 +1785,7 @@ class Algorithm(AlgorithmInterface):
         else:
             valid_masks = None
         loss_info, params = self.update_with_gradient(loss_info, valid_masks,
-                                                      weight, batch_info)
+                                                      weight, batch_info, skip_backward)
         self.after_update(experience.time_step, train_info)
 
         return experience, train_info, loss_info, params

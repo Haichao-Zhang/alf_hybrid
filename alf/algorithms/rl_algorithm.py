@@ -476,8 +476,8 @@ class RLAlgorithm(Algorithm):
             self._rollout_info_spec = dist_utils.extract_spec(policy_step.info)
         return policy_step
 
-    @common.mark_rollout
-    @data_distributed_when(lambda algorithm: algorithm.on_policy)
+    # @common.mark_rollout
+    # @data_distributed_when(lambda algorithm: algorithm.on_policy)
     def unroll(self, unroll_length: int):
         if self._config.async_unroll:
             return self._async_unroll(unroll_length)
@@ -683,7 +683,25 @@ class RLAlgorithm(Algorithm):
         else:
             return self._train_iter_off_policy()
 
-    def _train_iter_on_policy(self):
+    def train_iter_for_loss(self):
+        """Perform one iteration of training.
+
+        Users may choose to implement their own ``train_iter()``.
+
+        Returns:
+            int: the number of samples being trained on (including duplicates).
+        """
+        assert self.on_policy is not None
+
+        if self._config.empty_cache:
+            torch.cuda.empty_cache()
+        if self.on_policy:
+            return self._train_iter_on_policy(skip_backward=True)
+        else:
+            return self._train_iter_off_policy(skip_backward=True)
+
+
+    def _train_iter_on_policy(self, skip_backward=False):
         """User may override this for their own training procedure."""
         alf.summary.increment_global_counter()
 
@@ -695,15 +713,17 @@ class RLAlgorithm(Algorithm):
         with record_time("time/train"):
             train_info = experience.rollout_info
             experience = experience._replace(rollout_info=())
-            steps = self.train_from_unroll(experience, train_info)
+            steps = self.train_from_unroll(experience, train_info, skip_backward)
 
         with record_time("time/after_train_iter"):
             self.after_train_iter(experience, train_info)
 
         return steps
 
-    def _train_iter_off_policy(self):
+    def _train_iter_off_policy(self, skip_backward=False):
         """User may override this for their own training procedure."""
+        # mode: ["train", "loss"]
+
         config: TrainerConfig = self._config
 
         if not config.update_counter_every_mini_batch:
@@ -752,20 +772,25 @@ class RLAlgorithm(Algorithm):
             return 0
 
         self.train()
-        steps = self.train_from_replay_buffer(update_global_counter=True)
 
-        if unrolled:
-            with record_time("time/after_train_iter"):
-                if experience is not None:
-                    train_info = experience.rollout_info
-                    experience = experience._replace(rollout_info=())
-                else:
-                    experience = None
-                    train_info = None
-                self.after_train_iter(experience, train_info)
+        if skip_backward:
+            loss = self.train_from_replay_buffer(update_global_counter=True, skip_backward=skip_backward)
+            return loss
+        else:
+            steps = self.train_from_replay_buffer(update_global_counter=True, skip_backward=skip_backward)
 
-        # For now, we only return the steps of the primary algorithm's training
-        return steps
+            if unrolled:
+                with record_time("time/after_train_iter"):
+                    if experience is not None:
+                        train_info = experience.rollout_info
+                        experience = experience._replace(rollout_info=())
+                    else:
+                        experience = None
+                        train_info = None
+                    self.after_train_iter(experience, train_info)
+
+            # For now, we only return the steps of the primary algorithm's training
+            return steps
 
     def load_offline_replay_buffer(self, untransformed_observation_spec):
         """Load replay buffer from a replay buffer checkpoint.
