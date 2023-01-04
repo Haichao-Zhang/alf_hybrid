@@ -1173,19 +1173,19 @@ class Algorithm(AlgorithmInterface):
                     loss = self._grad_scaler.scale(loss)
                 loss.mean().backward()
 
-        self.disable_unused_params()
+        # self.disable_unused_params()
 
-        # for optimizer in optimizers:
-        #     if self._grad_scaler is not None:
-        #         # For ALF optimizers, gradient clipping is performed inside
-        #         # optimizer.step, so we don't need to explicityly unscale grad
-        #         # as the pytorch tutorial https://pytorch.org/docs/stable/notes/amp_examples.html#gradient-clipping
-        #         self._grad_scaler.step(optimizer)
-        #     else:
-        #         optimizer.step()
+        for optimizer in optimizers:
+            if self._grad_scaler is not None:
+                # For ALF optimizers, gradient clipping is performed inside
+                # optimizer.step, so we don't need to explicityly unscale grad
+                # as the pytorch tutorial https://pytorch.org/docs/stable/notes/amp_examples.html#gradient-clipping
+                self._grad_scaler.step(optimizer)
+            else:
+                optimizer.step()
 
-        # if self._grad_scaler is not None:
-        #     self._grad_scaler.update()
+        if self._grad_scaler is not None:
+            self._grad_scaler.update()
 
         all_params = [(self._param_to_name[p], p) for p in all_params]
         unused_parameters = [p[0] for p in all_params if p[1].grad is None]
