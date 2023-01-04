@@ -464,7 +464,7 @@ class Trainer(object):
 
         self._checkpointer = checkpointer
 
-def algorithm_creator(config, debug_summaries=True):
+def algorithm_creator(config, shared_actor=None, debug_summaries=True):
 
     algorithm_ctor = config.algorithm_ctor
 
@@ -494,6 +494,10 @@ def algorithm_creator(config, debug_summaries=True):
         env=env,
         config=config,
         debug_summaries=debug_summaries)
+
+    # dummy share test
+    algorithm.shared_actor = shared_actor
+
     return algorithm
 
 
