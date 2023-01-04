@@ -9,7 +9,7 @@ create_environment.env_name="Pendulum-v0"
 create_environment.num_parallel_environments=%NUM_PARALLEL_ENVIRONMENTS
 
 # algorithm config
-actor/ActorDistributionNetwork.fc_layer_params=(100, 100)
+actor/ActorDistributionNetwork.fc_layer_params=(2, 2)
 actor/ActorDistributionNetwork.continuous_projection_net_ctor=@NormalProjectionNetwork
 
 NormalProjectionNetwork.state_dependent_std=True
@@ -18,7 +18,7 @@ NormalProjectionNetwork.std_transform=@clipped_exp
 
 actor/Adam.lr=5e-4
 
-critic/CriticNetwork.joint_fc_layer_params=(100, 100)
+critic/CriticNetwork.joint_fc_layer_params=(2, 2)
 critic/Adam.lr=5e-4
 
 alpha/Adam.lr=5e-4
@@ -35,7 +35,7 @@ OneStepTDLoss.td_error_loss_fn=@losses.element_wise_squared_loss
 TrainerConfig.initial_collect_steps=1000
 TrainerConfig.mini_batch_length=2
 TrainerConfig.unroll_length=1
-TrainerConfig.mini_batch_size=64
+TrainerConfig.mini_batch_size=2
 TrainerConfig.num_updates_per_train_iter=1
 TrainerConfig.whole_replay_buffer_training=False
 TrainerConfig.clear_replay_buffer=False

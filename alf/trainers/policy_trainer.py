@@ -464,6 +464,38 @@ class Trainer(object):
 
         self._checkpointer = checkpointer
 
+def algorithm_creator(config, debug_summaries=True):
+
+    algorithm_ctor = config.algorithm_ctor
+
+    env = alf.get_env()
+    logging.info(
+        "observation_spec=%s" % pprint.pformat(env.observation_spec()))
+    logging.info("action_spec=%s" % pprint.pformat(env.action_spec()))
+
+    # for offline buffer construction
+    untransformed_observation_spec = env.observation_spec()
+
+    data_transformer = create_data_transformer(
+        config.data_transformer_ctor, untransformed_observation_spec)
+
+    # keep compatibility with previous gin based config
+    common.set_global_env(env)
+
+    observation_spec = data_transformer.transformed_observation_spec
+    common.set_transformed_observation_spec(observation_spec)
+    logging.info("transformed_observation_spec=%s" %
+                    pprint.pformat(observation_spec))
+
+    algorithm = algorithm_ctor(
+        observation_spec=observation_spec,
+        action_spec=env.action_spec(),
+        reward_spec=env.reward_spec(),
+        env=env,
+        config=config,
+        debug_summaries=debug_summaries)
+    return algorithm
+
 
 class RLTrainer(Trainer):
     """Trainer for reinforcement learning. """
