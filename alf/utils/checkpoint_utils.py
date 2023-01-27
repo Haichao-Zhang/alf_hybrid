@@ -186,19 +186,28 @@ class Checkpointer(object):
                 for k in new[mk].keys():
                     merged[mk][k] = new[mk][k]
 
+        f_path = None
         if global_step == "latest":
-            global_step = self._get_latest_checkpoint_step()
+            f_path = os.path.join(self._ckpt_dir, "latest")
+            if not os.path.isfile(f_path):
+                warnings.warn("Checkpoint '%s' does not exist." % f_path)
 
-        if global_step is None:
-            warnings.warn("There is no checkpoint in directory %s. "
-                          "Train from scratch" % self._ckpt_dir)
+        if f_path is None or not os.path.isfile(f_path):
+            if global_step is None:
+                global_step = self._get_latest_checkpoint_step()
+
+            if global_step is None:
+                warnings.warn("There is no checkpoint in directory %s. "
+                              "Train from scratch" % self._ckpt_dir)
+                return self._global_step
+
+            else:
+                f_path = os.path.join(self._ckpt_dir,
+                                      "ckpt-{0}".format(global_step))
+
+        if f_path is None or not os.path.isfile(f_path):
             return self._global_step
 
-        f_path = os.path.join(self._ckpt_dir, "ckpt-{0}".format(global_step))
-        if not os.path.isfile(f_path):
-            warnings.warn(
-                "Checkpoint '%s' does not exist. Train from scratch." % f_path)
-            return self._global_step
 
         map_location = None
         if not torch.cuda.is_available():
