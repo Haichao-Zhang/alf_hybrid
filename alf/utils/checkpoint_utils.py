@@ -273,7 +273,7 @@ class Checkpointer(object):
 
         return model_state, optimizer_state, replay_buffer_state
 
-    def save(self, global_step):
+    def save(self, global_step, only_latest=False):
         """Save states of all modules to checkpoint
 
         Args:
@@ -282,27 +282,59 @@ class Checkpointer(object):
                 the checkpoint as a suffix. This function will also save a copy
                 of the latest checkpoint in a file named 'latest'.
         """
-        self._global_step = global_step
-        f_path = os.path.join(self._ckpt_dir, "ckpt-{0}".format(global_step))
-        state = {
-            k: v.module.state_dict()
-            if type(v) == torch.nn.DataParallel else v.state_dict()
-            for k, v in self._modules.items()
-        }
-        model_state = {}
-        optimizer_state = {}
-        replay_buffer_state = {}
-        for k, v in state.items():
-            ms, opts, rs = self._separate_state(v)
-            model_state[k] = ms
-            optimizer_state[k] = opts
-            replay_buffer_state[k] = rs
 
-        model_state['global_step'] = global_step
+        if only_latest:
 
-        torch.save(model_state, f_path)
-        torch.save(optimizer_state, f_path + '-optimizer')
-        torch.save(replay_buffer_state, f_path + '-replay_buffer')
+            f_path = os.path.join(self._ckpt_dir, "latest")
+            state = {
+                k: v.module.state_dict()
+                if type(v) == torch.nn.DataParallel else v.state_dict()
+                for k, v in self._modules.items()
+            }
+            model_state = {}
+            optimizer_state = {}
+            replay_buffer_state = {}
+            for k, v in state.items():
+                ms, opts, rs = self._separate_state(v)
+                model_state[k] = ms
+                optimizer_state[k] = opts
+                replay_buffer_state[k] = rs
 
-        logging.info(
-            "Checkpoint 'ckpt-{}' is saved successfully.".format(global_step))
+            model_state['global_step'] = global_step
+
+            torch.save(model_state, f_path)
+            # torch.save(optimizer_state, f_path + '-optimizer')
+            # torch.save(replay_buffer_state, f_path + '-replay_buffer')
+
+            logging.info(
+                "Checkpoint 'latest' is saved successfully for step {0}.".
+                format(global_step))
+        else:
+
+            self._global_step = global_step
+            f_path = os.path.join(self._ckpt_dir,
+                                  "ckpt-{0}".format(global_step))
+            state = {
+                k: v.module.state_dict()
+                if type(v) == torch.nn.DataParallel else v.state_dict()
+                for k, v in self._modules.items()
+            }
+            model_state = {}
+            optimizer_state = {}
+            replay_buffer_state = {}
+
+            for k, v in state.items():
+                ms, opts, rs = self._separate_state(v)
+                model_state[k] = ms
+                optimizer_state[k] = opts
+                replay_buffer_state[k] = rs
+
+            model_state['global_step'] = global_step
+
+            torch.save(model_state, f_path)
+            torch.save(optimizer_state, f_path + '-optimizer')
+
+            torch.save(replay_buffer_state, f_path + '-replay_buffer')
+
+            logging.info("Checkpoint 'ckpt-{}' is saved successfully.".format(
+                global_step))

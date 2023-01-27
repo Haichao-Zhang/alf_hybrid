@@ -39,6 +39,7 @@ class TrainerConfig(object):
                  use_rollout_state=False,
                  temporally_independent_train_step=None,
                  num_checkpoints=10,
+                 latest_checkpoint_interval=-1,
                  confirm_checkpoint_upon_crash=True,
                  no_thread_env_for_conf=False,
                  evaluate=False,
@@ -317,6 +318,7 @@ class TrainerConfig(object):
         self.use_rollout_state = use_rollout_state
         self.temporally_independent_train_step = temporally_independent_train_step
         self.num_checkpoints = num_checkpoints
+        self.latest_checkpoint_interval = latest_checkpoint_interval
         self.confirm_checkpoint_upon_crash = confirm_checkpoint_upon_crash
         self.no_thread_env_for_conf = no_thread_env_for_conf
         self.evaluate = evaluate

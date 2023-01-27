@@ -260,6 +260,7 @@ class Trainer(object):
         self._algorithm = None
 
         self._num_checkpoints = config.num_checkpoints
+        self._latest_checkpoint_interval = config.latest_checkpoint_interval
         self._checkpointer = None
 
         self._evaluate = config.evaluate
@@ -429,12 +430,16 @@ class Trainer(object):
     def _request_debug(self, signum, frame):
         self._debug_requested = True
 
-    def _save_checkpoint(self):
+    def _save_checkpoint(self, only_latest=False):
         # Saving checkpoint is only enabled when running single process training
         # (rank is -1) or master process of DDP training (rank is 0).
         if self._rank <= 0:
             global_step = alf.summary.get_global_counter()
-            self._checkpointer.save(global_step=global_step)
+            if not only_latest:
+                self._checkpointer.save(global_step=global_step)
+            else:
+                self._checkpointer.save(
+                    global_step=global_step, only_latest=only_latest)
 
     def _restore_checkpoint(self, checkpointer):
         """Retore from saved checkpoint.
@@ -647,6 +652,14 @@ class RLTrainer(Trainer):
             iter_num += 1
 
             self._trainer_progress.update(iter_num, total_time_steps)
+
+            if (self._num_iterations and iter_num
+                    and (iter_num % self._latest_checkpoint_interval == 0)) \
+                or  (self._num_env_steps and total_time_steps
+                    and (total_time_steps % self._latest_checkpoint_interval == 0)):
+                if self._latest_checkpoint_interval > 0:
+                    self._save_checkpoint(only_latest=True)
+
 
             if ((self._num_iterations and iter_num >= self._num_iterations)
                     or (not self._num_iterations
