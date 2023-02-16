@@ -492,6 +492,11 @@ def algorithm_creator(config, shared_actor=None, debug_summaries=True):
     logging.info("transformed_observation_spec=%s" %
                     pprint.pformat(observation_spec))
 
+    # update data transformer in the config, before using the config for algorithm
+    # construction
+    config.data_transformer = data_transformer
+
+
     algorithm = algorithm_ctor(
         observation_spec=observation_spec,
         action_spec=env.action_spec(),

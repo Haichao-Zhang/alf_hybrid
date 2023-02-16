@@ -91,6 +91,17 @@ class Identity(ElementwiseLayerBase):
         return x
 
 
+class Constant(ElementwiseLayerBase):
+    """A layer that simply returns its argument as result."""
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.zeros(x.shape[0], 6)
+
+
+
 class Cast(ElementwiseLayerBase):
     """A layer that cast the dtype of the elements of the input tensor."""
 

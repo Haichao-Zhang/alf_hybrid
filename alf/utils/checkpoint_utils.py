@@ -193,7 +193,7 @@ class Checkpointer(object):
                 warnings.warn("Checkpoint '%s' does not exist." % f_path)
 
         if f_path is None or not os.path.isfile(f_path):
-            if global_step is None:
+            if global_step is None or global_step == "latest":
                 global_step = self._get_latest_checkpoint_step()
 
             if global_step is None:
