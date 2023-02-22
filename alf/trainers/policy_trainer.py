@@ -15,6 +15,7 @@
 
 import abc
 from absl import logging
+from functools import partial
 from typing import Dict
 import math
 import os
@@ -497,6 +498,18 @@ def algorithm_creator(config, shared_actor=None, debug_summaries=True):
     config.data_transformer = data_transformer
 
 
+    # overwrite actor_cls explicitly here
+    def actor_ctor(input_tensor_spec, action_spec):
+        class actor_network_cls(object):
+            def __init__(self, shared_actor):
+                self._shared_actor = shared_actor
+
+            def forward(self, x):
+                return self._shared_actor.forward(x, return_dist=True)
+
+        return actor_network_cls
+
+
     algorithm = algorithm_ctor(
         observation_spec=observation_spec,
         action_spec=env.action_spec(),
@@ -505,8 +518,6 @@ def algorithm_creator(config, shared_actor=None, debug_summaries=True):
         config=config,
         debug_summaries=debug_summaries)
 
-    # dummy share test
-    algorithm.shared_actor = shared_actor
 
     return algorithm
 

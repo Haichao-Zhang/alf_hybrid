@@ -749,6 +749,8 @@ class Algorithm(AlgorithmInterface):
     def get_initial_rollout_state(self, batch_size):
         r = self._initial_rollout_states.get(batch_size)
         if r is None:
+            print("===========self._rollout_state_spec")
+            print(self._rollout_state_spec)
             r = spec_utils.zeros_from_spec(self._rollout_state_spec,
                                            batch_size)
             self._initial_rollout_states[batch_size] = r
